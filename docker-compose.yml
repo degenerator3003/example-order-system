@@ -1,0 +1,61 @@
+
+services: 
+  mongo:
+    build: ./mongo
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD","mongo","--eval","db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - mongo_data:/data/db
+  
+  rabbit:
+    image: rabbitmq:3-management
+    container_name: rabbit
+    ports: 
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD","rabbitmq-diagnostics","ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PATH: guest
+
+  api:
+    build: ./api
+    container_name: api_service
+    ports:
+      - "8000:8000"
+    environment: 
+      - MONGO_URL=mongodb://mongo:27017/demo
+      - RABBIT_URL=amqp://guest:guest@rabbit:5672/
+    depends_on:
+      - mongo
+      - rabbit
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  worker:
+    build: ./worker
+    container_name: worker_service
+    depends_on:
+      rabbit:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/demo
+      - RABBIT_URL=amqp://guest:guest@rabbit:5672/
+
+volumes:
+  mongo_data:
+
+
+
+
